@@ -1,7 +1,4 @@
-const DB_NAME = 'gptextract-db';
-const DB_STORE = 'store';
-const FOLDER_KEY = 'folderHandle';
-const STORAGE_EXTRACTED_IDS = 'extractedConversationIds';
+const STORAGE_EXTRACTED_BY_FOLDER = 'extractedByFolder';
 
 let folderHandle = null;
 
@@ -11,58 +8,59 @@ const folderSelectorEl = document.getElementById('folder-selector');
 const chooseFolderBtn = document.getElementById('choose-folder-btn');
 const exportBtn = document.getElementById('export-btn');
 const exportAllBtn = document.getElementById('export-all-btn');
-const skipExportedCb = document.getElementById('skip-exported-cb');
 
-function openDB() {
-  return new Promise(function (resolve, reject) {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onerror = function () { reject(req.error); };
-    req.onsuccess = function () { resolve(req.result); };
-    req.onupgradeneeded = function (e) {
-      e.target.result.createObjectStore(DB_STORE);
-    };
-  });
-}
-
-function getStoredFolderHandle() {
-  return openDB().then(function (db) {
-    return new Promise(function (resolve, reject) {
-      const tx = db.transaction(DB_STORE, 'readonly');
-      const req = tx.objectStore(DB_STORE).get(FOLDER_KEY);
-      req.onerror = function () { reject(req.error); };
-      req.onsuccess = function () { resolve(req.result); };
-    });
-  });
-}
-
-function setStoredFolderHandle(handle) {
-  return openDB().then(function (db) {
-    return new Promise(function (resolve, reject) {
-      const tx = db.transaction(DB_STORE, 'readwrite');
-      const req = tx.objectStore(DB_STORE).put(handle, FOLDER_KEY);
-      req.onerror = function () { reject(req.error); };
-      req.onsuccess = function () { resolve(); };
-    });
-  });
-}
-
-function getExtractedIds() {
+function getExtractedIds(folderName) {
+  var key = folderName || (folderHandle && folderHandle.name);
+  if (!key) return Promise.resolve([]);
   return new Promise(function (resolve) {
-    chrome.storage.local.get(STORAGE_EXTRACTED_IDS, function (data) {
-      resolve(Array.isArray(data[STORAGE_EXTRACTED_IDS]) ? data[STORAGE_EXTRACTED_IDS] : []);
+    chrome.storage.local.get(STORAGE_EXTRACTED_BY_FOLDER, function (data) {
+      var byFolder = data[STORAGE_EXTRACTED_BY_FOLDER];
+      resolve(key && byFolder && Array.isArray(byFolder[key]) ? byFolder[key] : []);
     });
   });
 }
 
-function addExtractedId(id) {
+function addExtractedId(id, folderName) {
   if (!id) return Promise.resolve();
-  return getExtractedIds().then(function (ids) {
-    if (ids.indexOf(id) >= 0) return;
-    ids.push(id);
-    return new Promise(function (resolve) {
-      chrome.storage.local.set({ [STORAGE_EXTRACTED_IDS]: ids }, resolve);
+  var key = folderName || (folderHandle && folderHandle.name);
+  if (!key) return Promise.resolve();
+  var idPart = String(id).slice(0, 8);
+  return new Promise(function (resolve) {
+    chrome.storage.local.get(STORAGE_EXTRACTED_BY_FOLDER, function (data) {
+      var byFolder = data[STORAGE_EXTRACTED_BY_FOLDER] || {};
+      if (!Array.isArray(byFolder[key])) byFolder[key] = [];
+      if (byFolder[key].indexOf(idPart) >= 0) return resolve();
+      byFolder[key].push(idPart);
+      chrome.storage.local.set({ [STORAGE_EXTRACTED_BY_FOLDER]: byFolder }, resolve);
     });
   });
+}
+
+function listMdFileIdsInFolder(handle) {
+  var ids = [];
+  var it = handle.entries();
+  function next() {
+    return it.next().then(function (result) {
+      if (result.done) return ids;
+      var name = result.value[0];
+      var entry = result.value[1];
+      if (entry.kind === 'file' && name.toLowerCase().endsWith('.md')) {
+        var idPart = (name.replace(/\.md$/i, '').split('-').pop() || '').slice(0, 8);
+        if (idPart && /^[a-f0-9]{8}$/i.test(idPart)) ids.push(idPart);
+      }
+      return next();
+    });
+  }
+  return next();
+}
+
+function syncFolderRegistry(handle) {
+  if (!handle || !handle.name) return Promise.resolve();
+  return listMdFileIdsInFolder(handle).then(function (ids) {
+    return new Promise(function (resolve) {
+      chrome.storage.local.set({ [STORAGE_EXTRACTED_BY_FOLDER]: { [handle.name]: ids } }, resolve);
+    });
+  }).catch(function () {});
 }
 
 function setExportEnabled(enabled) {
@@ -119,15 +117,12 @@ chooseFolderBtn.addEventListener('click', async function () {
   try {
     const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
     folderHandle = handle;
-    folderLabel.textContent = handle.name;
+    folderLabel.textContent = handle.name || '';
+    folderLabel.title = handle.name || '';
     setExportEnabled(true);
     statusEl.textContent = 'Pasta escolhida. Clique em Exportar.';
     statusEl.className = 'status';
-    try {
-      await setStoredFolderHandle(handle);
-    } catch (e) {
-      console.warn('Could not persist folder to IndexedDB', e);
-    }
+    await syncFolderRegistry(handle);
   } catch (err) {
     if (err.name !== 'AbortError') {
       statusEl.textContent = 'Erro ao escolher pasta.';
@@ -179,7 +174,7 @@ exportBtn.addEventListener('click', function () {
         await writable.write(response.markdown);
         await writable.close();
         if (response.conversationId) {
-          addExtractedId(response.conversationId).catch(function () {});
+          addExtractedId(response.conversationId, folderHandle.name).catch(function () {});
         }
         statusEl.textContent = 'Exportado!';
         statusEl.className = 'status status-success';
@@ -199,8 +194,7 @@ exportAllBtn.addEventListener('click', async function () {
     return;
   }
 
-  const skipExported = skipExportedCb && skipExportedCb.checked;
-  const extractedIds = skipExported ? await getExtractedIds() : [];
+  const extractedIds = folderHandle ? await getExtractedIds(folderHandle.name) : [];
 
   chrome.tabs.query({ active: true, currentWindow: true }, async function (tabs) {
     const tab = tabs[0];
@@ -224,14 +218,15 @@ exportAllBtn.addEventListener('click', async function () {
       }
 
       let conversationsToExport = listResponse.conversations || [];
-      if (skipExported && extractedIds.length) {
+      if (extractedIds.length) {
         conversationsToExport = conversationsToExport.filter(function (c) {
-          const id = (c.url || '').split('/c/').pop().split('/')[0].split('?')[0];
-          return id && extractedIds.indexOf(id) < 0;
+          var rawId = (c.url || '').split('/c/').pop().split('/')[0].split('?')[0];
+          var id8 = rawId ? String(rawId).slice(0, 8) : '';
+          return id8 && extractedIds.indexOf(id8) < 0;
         });
       }
       if (!conversationsToExport.length) {
-        statusEl.textContent = skipExported ? 'Nenhuma conversa nova para exportar.' : 'Nenhuma conversa encontrada na barra lateral.';
+        statusEl.textContent = extractedIds.length ? 'Nenhuma conversa nova para exportar.' : 'Nenhuma conversa encontrada na barra lateral.';
         statusEl.className = 'status status-error';
         return;
       }
@@ -273,7 +268,7 @@ exportAllBtn.addEventListener('click', async function () {
             await writable.write(exportResponse.markdown);
             await writable.close();
             if (exportResponse.conversationId) {
-              addExtractedId(exportResponse.conversationId).catch(function () {});
+              addExtractedId(exportResponse.conversationId, folderHandle.name).catch(function () {});
             }
             exported++;
           }
@@ -288,22 +283,8 @@ exportAllBtn.addEventListener('click', async function () {
   });
 });
 
-function restoreSavedFolder() {
-  getStoredFolderHandle()
-    .then(function (handle) {
-      if (!handle || typeof handle.queryPermission !== 'function') return;
-      return handle.queryPermission({ mode: 'readwrite' }).then(function (result) {
-        if (result === 'granted') {
-          folderHandle = handle;
-          folderLabel.textContent = handle.name;
-          setExportEnabled(true);
-          statusEl.textContent = 'Pasta restaurada. Clique em Exportar.';
-          statusEl.className = 'status';
-        }
-      });
-    })
-    .catch(function () {});
+if (chrome.runtime && chrome.runtime.connect) {
+  chrome.runtime.connect({ name: 'popup' });
 }
 
 setExportEnabled(false);
-restoreSavedFolder();

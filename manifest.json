@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Export ChatGPT conversations to local .md files",
   "permissions": ["activeTab", "storage"],
+  "background": { "service_worker": "background.js" },
   "action": { "default_popup": "popup/popup.html" },
   "host_permissions": ["*://chat.openai.com/*", "*://chatgpt.com/*"],
   "content_scripts": [
