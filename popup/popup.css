@@ -93,3 +93,32 @@ h1 {
 #export-btn.export-btn--disabled:hover {
   background: #0d6efd;
 }
+
+#export-all-btn {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 14px;
+  cursor: pointer;
+  background: #e9ecef;
+  color: #212529;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+}
+
+#export-all-btn:hover {
+  background: #dee2e6;
+}
+
+#export-all-btn:active {
+  background: #ced4da;
+}
+
+#export-all-btn.export-btn--disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+#export-all-btn.export-btn--disabled:hover {
+  background: #e9ecef;
+}

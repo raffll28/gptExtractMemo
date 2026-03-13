@@ -23,7 +23,10 @@
       : `chatgpt-${Date.now()}.md`;
 
     if (returnContent) {
-      return { success: true, markdown: md, filename: filename };
+      const pathname = window.location.pathname || '';
+      const idMatch = pathname.match(/\/c\/([a-f0-9-]+)/i);
+      const conversationId = idMatch ? idMatch[1] : undefined;
+      return { success: true, markdown: md, filename: filename, conversationId: conversationId };
     }
 
     const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
@@ -40,6 +43,23 @@
     return { success: true };
   }
 
+  function getConversationList() {
+    const links = document.querySelectorAll('#history a[data-sidebar-item="true"], a[data-sidebar-item="true"][href*="/c/"]');
+    const base = window.location.origin;
+    const conversations = [];
+    for (const link of links) {
+      const href = link.getAttribute('href');
+      if (!href || !href.includes('/c/')) continue;
+      const title =
+        link.getAttribute('aria-label') ||
+        (link.querySelector('span[dir="auto"]') && link.querySelector('span[dir="auto"]').textContent) ||
+        (link.querySelector('.truncate span') && link.querySelector('.truncate span').textContent) ||
+        '';
+      conversations.push({ url: base + href, title: (title || 'Conversa').trim() });
+    }
+    return { success: true, conversations: conversations };
+  }
+
   chrome.runtime.onMessage.addListener(function (message, _sender, sendResponse) {
     if (message && message.action === 'doExport') {
       try {
@@ -47,6 +67,14 @@
         sendResponse(result);
       } catch (err) {
         sendResponse({ success: false, error: (err && err.message) || 'Erro ao exportar.' });
+      }
+      return true;
+    }
+    if (message && message.action === 'getConversationList') {
+      try {
+        sendResponse(getConversationList());
+      } catch (err) {
+        sendResponse({ success: true, conversations: [] });
       }
       return true;
     }
