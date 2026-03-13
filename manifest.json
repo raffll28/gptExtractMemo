@@ -3,7 +3,7 @@
   "name": "ChatGPT to Markdown",
   "version": "1.0.0",
   "description": "Export ChatGPT conversations to local .md files",
-  "permissions": ["activeTab"],
+  "permissions": ["activeTab", "storage"],
   "action": { "default_popup": "popup/popup.html" },
   "host_permissions": ["*://chat.openai.com/*", "*://chatgpt.com/*"],
   "content_scripts": [
