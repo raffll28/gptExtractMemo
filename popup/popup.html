@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,13 +8,13 @@
 </head>
 <body>
   <h1>ChatGPT to Markdown</h1>
-  <p id="status" class="status">Escolha uma pasta e exporte a conversa.</p>
+  <p id="status" class="status">Choose a folder and export the conversation.</p>
   <div id="folder-selector" class="folder-selector">
-    <button id="choose-folder-btn" type="button">Escolher pasta</button>
-    <span id="folder-label">Nenhuma pasta escolhida</span>
+    <input type="text" id="folder-path-input" placeholder="path" readonly>
+    <button id="choose-folder-btn" type="button" title="Choose folder">...</button>
   </div>
-  <button id="export-btn" type="button" class="export-btn--disabled" aria-disabled="true">Exportar para Markdown</button>
-  <button id="export-all-btn" type="button" class="export-btn export-btn-secondary export-btn--disabled" aria-disabled="true">Exportar todas</button>
+  <button id="export-btn" type="button" class="export-btn--disabled" aria-disabled="true">Extract one</button>
+  <button id="export-all-btn" type="button" class="export-btn export-btn-secondary export-btn--disabled" aria-disabled="true">Extract all</button>
   <script src="popup.js"></script>
 </body>
 </html>

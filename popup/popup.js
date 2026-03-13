@@ -3,7 +3,7 @@ const STORAGE_EXTRACTED_BY_FOLDER = 'extractedByFolder';
 let folderHandle = null;
 
 const statusEl = document.getElementById('status');
-const folderLabel = document.getElementById('folder-label');
+const folderPathInput = document.getElementById('folder-path-input');
 const folderSelectorEl = document.getElementById('folder-selector');
 const chooseFolderBtn = document.getElementById('choose-folder-btn');
 const exportBtn = document.getElementById('export-btn');
@@ -71,13 +71,13 @@ function setExportEnabled(enabled) {
 }
 
 function slugifyForFilename(title) {
-  return (title || 'conversa')
+  return (title || 'conversation')
     .trim()
     .slice(0, 50)
     .replace(/[^\w\s-]/g, '')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '') || 'conversa';
+    .replace(/^-|-$/g, '') || 'conversation';
 }
 
 const EXPORT_READY_DELAY_MS = 800;
@@ -110,22 +110,22 @@ function shakeFolderSelector() {
 
 chooseFolderBtn.addEventListener('click', async function () {
   if (typeof window.showDirectoryPicker !== 'function') {
-    statusEl.textContent = 'Seu navegador não suporta escolher pasta.';
+    statusEl.textContent = 'Your browser does not support choosing a folder.';
     statusEl.className = 'status status-error';
     return;
   }
   try {
     const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
     folderHandle = handle;
-    folderLabel.textContent = handle.name || '';
-    folderLabel.title = handle.name || '';
+    folderPathInput.value = handle.name || '';
+    folderPathInput.title = handle.name || '';
     setExportEnabled(true);
-    statusEl.textContent = 'Pasta escolhida. Clique em Exportar.';
+    statusEl.textContent = 'Folder chosen. Click Extract.';
     statusEl.className = 'status';
     await syncFolderRegistry(handle);
   } catch (err) {
     if (err.name !== 'AbortError') {
-      statusEl.textContent = 'Erro ao escolher pasta.';
+      statusEl.textContent = 'Error choosing folder.';
       statusEl.className = 'status status-error';
     }
   }
@@ -134,36 +134,36 @@ chooseFolderBtn.addEventListener('click', async function () {
 exportBtn.addEventListener('click', function () {
   if (!folderHandle) {
     shakeFolderSelector();
-    statusEl.textContent = 'Escolha uma pasta primeiro.';
+    statusEl.textContent = 'Choose a folder first.';
     statusEl.className = 'status status-error';
     return;
   }
 
-  statusEl.textContent = 'Exportando...';
+  statusEl.textContent = 'Extracting...';
   statusEl.className = 'status';
 
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
     const tab = tabs[0];
     if (!tab || !tab.id) {
-      statusEl.textContent = 'Nenhuma aba ativa.';
+      statusEl.textContent = 'No active tab.';
       statusEl.className = 'status status-error';
       return;
     }
     const url = (tab.url || '').toLowerCase();
     if (!url.includes('chat.openai.com') && !url.includes('chatgpt.com')) {
-      statusEl.textContent = 'Abra chat.openai.com ou chatgpt.com em uma conversa.';
+      statusEl.textContent = 'Open chat.openai.com or chatgpt.com in a conversation.';
       statusEl.className = 'status status-error';
       return;
     }
 
     chrome.tabs.sendMessage(tab.id, { action: 'doExport', returnContent: true }, async function (response) {
       if (chrome.runtime.lastError) {
-        statusEl.textContent = 'Recarregue a página do chat e tente de novo.';
+        statusEl.textContent = 'Reload the chat page and try again.';
         statusEl.className = 'status status-error';
         return;
       }
       if (!response || !response.success || !response.markdown || !response.filename) {
-        statusEl.textContent = (response && response.error) || 'Nenhuma mensagem encontrada.';
+        statusEl.textContent = (response && response.error) || 'No messages found.';
         statusEl.className = 'status status-error';
         return;
       }
@@ -176,10 +176,10 @@ exportBtn.addEventListener('click', function () {
         if (response.conversationId) {
           addExtractedId(response.conversationId, folderHandle.name).catch(function () {});
         }
-        statusEl.textContent = 'Exportado!';
+        statusEl.textContent = 'Extracted!';
         statusEl.className = 'status status-success';
       } catch (err) {
-        statusEl.textContent = 'Erro ao salvar arquivo. Pasta pode ter sido removida.';
+        statusEl.textContent = 'Error saving file. Folder may have been removed.';
         statusEl.className = 'status status-error';
       }
     });
@@ -189,7 +189,7 @@ exportBtn.addEventListener('click', function () {
 exportAllBtn.addEventListener('click', async function () {
   if (!folderHandle) {
     shakeFolderSelector();
-    statusEl.textContent = 'Escolha uma pasta primeiro.';
+    statusEl.textContent = 'Choose a folder first.';
     statusEl.className = 'status status-error';
     return;
   }
@@ -199,20 +199,20 @@ exportAllBtn.addEventListener('click', async function () {
   chrome.tabs.query({ active: true, currentWindow: true }, async function (tabs) {
     const tab = tabs[0];
     if (!tab || !tab.id) {
-      statusEl.textContent = 'Nenhuma aba ativa.';
+      statusEl.textContent = 'No active tab.';
       statusEl.className = 'status status-error';
       return;
     }
     const tabUrl = (tab.url || '').toLowerCase();
     if (!tabUrl.includes('chat.openai.com') && !tabUrl.includes('chatgpt.com')) {
-      statusEl.textContent = 'Abra chat.openai.com ou chatgpt.com.';
+      statusEl.textContent = 'Open chat.openai.com or chatgpt.com.';
       statusEl.className = 'status status-error';
       return;
     }
 
     chrome.tabs.sendMessage(tab.id, { action: 'getConversationList' }, async function (listResponse) {
       if (chrome.runtime.lastError || !listResponse || !listResponse.success) {
-        statusEl.textContent = 'Nenhuma conversa encontrada na barra lateral.';
+        statusEl.textContent = 'No conversations found in the sidebar.';
         statusEl.className = 'status status-error';
         return;
       }
@@ -226,20 +226,20 @@ exportAllBtn.addEventListener('click', async function () {
         });
       }
       if (!conversationsToExport.length) {
-        statusEl.textContent = extractedIds.length ? 'Nenhuma conversa nova para exportar.' : 'Nenhuma conversa encontrada na barra lateral.';
+        statusEl.textContent = extractedIds.length ? 'No new conversations to export.' : 'No conversations found in the sidebar.';
         statusEl.className = 'status status-error';
         return;
       }
 
       const total = conversationsToExport.length;
-      statusEl.textContent = total + ' conversas para exportar. Iniciando...';
+      statusEl.textContent = total + ' conversations to export. Starting...';
       statusEl.className = 'status';
 
       let exported = 0;
 
       for (let i = 0; i < conversationsToExport.length; i++) {
         const conv = conversationsToExport[i];
-        statusEl.textContent = 'Exportando ' + (i + 1) + ' de ' + total + '...';
+        statusEl.textContent = 'Extracting ' + (i + 1) + ' of ' + total + '...';
         statusEl.className = 'status';
 
         try {
@@ -277,7 +277,7 @@ exportAllBtn.addEventListener('click', async function () {
         }
       }
 
-      statusEl.textContent = 'Exportadas ' + exported + ' conversas.';
+      statusEl.textContent = 'Extracted ' + exported + ' conversations.';
       statusEl.className = 'status status-success';
     });
   });

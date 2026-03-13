@@ -5,12 +5,12 @@
 (function () {
   function doExport(returnContent) {
     if (!window.GPTExtract || !window.GPTExtract.extract || !window.GPTExtract.toMarkdown) {
-      return { success: false, error: 'Extensão não pronta. Recarregue a página.' };
+      return { success: false, error: 'Extension not ready. Reload the page.' };
     }
 
     const messages = window.GPTExtract.extract();
     if (!messages.length) {
-      return { success: false, error: 'Nenhuma mensagem encontrada nesta conversa.' };
+      return { success: false, error: 'No messages found in this conversation.' };
     }
 
     const md = window.GPTExtract.toMarkdown(messages, {
@@ -55,7 +55,7 @@
         (link.querySelector('span[dir="auto"]') && link.querySelector('span[dir="auto"]').textContent) ||
         (link.querySelector('.truncate span') && link.querySelector('.truncate span').textContent) ||
         '';
-      conversations.push({ url: base + href, title: (title || 'Conversa').trim() });
+      conversations.push({ url: base + href, title: (title || 'Conversation').trim() });
     }
     return { success: true, conversations: conversations };
   }
@@ -66,7 +66,7 @@
         const result = doExport(message.returnContent === true);
         sendResponse(result);
       } catch (err) {
-        sendResponse({ success: false, error: (err && err.message) || 'Erro ao exportar.' });
+        sendResponse({ success: false, error: (err && err.message) || 'Error exporting.' });
       }
       return true;
     }
