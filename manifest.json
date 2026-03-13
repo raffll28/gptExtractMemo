@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "ChatGPT to Markdown",
+  "version": "1.0.0",
+  "description": "Export ChatGPT conversations to local .md files",
+  "permissions": ["activeTab"],
+  "action": { "default_popup": "popup/popup.html" },
+  "host_permissions": ["*://chat.openai.com/*", "*://chatgpt.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["*://chat.openai.com/*", "*://chatgpt.com/*"],
+      "js": [
+        "src/content/extract.js",
+        "src/content/toMarkdown.js",
+        "src/content/content.js"
+      ],
+      "css": ["src/styles/content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
